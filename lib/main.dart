@@ -1,7 +1,26 @@
+import 'package:background_fetch/background_fetch.dart';
 import 'package:flutter/material.dart';
 
 void main() {
   runApp(const MyApp());
+  // Register to receive BackgroundFetch events after app is terminated.
+  BackgroundFetch.registerHeadlessTask(backgroundFetchHeadlessTask);
+}
+
+@pragma('vm:entry-point')
+void backgroundFetchHeadlessTask(HeadlessEvent task) async {
+  String taskId = task.taskId;
+  bool isTimeout = task.timeout;
+
+  if (isTimeout) {
+    print("[BackgroundFetch] Headless TIMEOUT: $taskId");
+    BackgroundFetch.finish(taskId);
+    return;
+  }
+
+  print("[BackgroundFetch] Headless event: $taskId");
+  // Perform your work here...
+  BackgroundFetch.finish(taskId);
 }
 
 class MyApp extends StatelessWidget {
@@ -56,6 +75,29 @@ class MyHomePage extends StatefulWidget {
 class _MyHomePageState extends State<MyHomePage> {
   int _counter = 0;
 
+  Future<void> initBackgroundFetch() async {
+    int status = await BackgroundFetch.configure(
+      BackgroundFetchConfig(
+        minimumFetchInterval: 15, // minutes
+        stopOnTerminate: false,
+        startOnBoot: true,
+        enableHeadless: true,
+      ),
+          (String taskId) async {
+        // <-- Event callback
+        print("[BackgroundFetch] Event received: $taskId");
+        // Perform your work here...
+        BackgroundFetch.finish(taskId);
+      },
+          (String taskId) async {
+        // <-- Timeout callback
+        print("[BackgroundFetch] TIMEOUT: $taskId");
+        BackgroundFetch.finish(taskId);
+      },
+    );
+    print("[BackgroundFetch] configure status: $status");
+  }
+
   void _incrementCounter() {
     setState(() {
       // This call to setState tells the Flutter framework that something has
@@ -65,6 +107,12 @@ class _MyHomePageState extends State<MyHomePage> {
       // called again, and so nothing would appear to happen.
       _counter++;
     });
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    initBackgroundFetch();
   }
 
   @override
